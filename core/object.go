@@ -4,8 +4,11 @@ package core
 type GodisObject struct {
 	ObjectType int
 	//encoding   uint
-	Ptr        interface{}
+	Ptr interface{}
 }
+
+const C_ERR = -1
+const C_OK = 0
 
 const ObjectTypeString = 0
 const OBJ_LIST = 1

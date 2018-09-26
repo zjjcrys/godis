@@ -18,6 +18,12 @@ type GeoHashRange struct {
 	max float64
 }
 
+type GeoHashArea struct {
+	hash      GeoHashBits
+	longitude GeoHashRange
+	latitude  GeoHashRange
+}
+
 func geohashEncodeWGS84(longitude float64, latitude float64, step uint8, hash *GeoHashBits) int {
 	return geohashEncodeType(longitude, latitude, step, hash)
 }
@@ -94,8 +100,104 @@ func interleave64(latOffset int32, lngOffset int32) uint64 {
 	return x | (y << 1)
 }
 
+func deinterleave64(interleaved uint64) uint64 {
+	B := []uint64{0x5555555555555555, 0x3333333333333333,
+		0x0F0F0F0F0F0F0F0F, 0x00FF00FF00FF00FF,
+		0x0000FFFF0000FFFF}
+
+	S := []uint8{1, 2, 4, 8, 16}
+	x := interleaved
+	y := interleaved >> 1
+	x = (x | (x >> S[0])) & B[0]
+	y = (y | (y >> S[0])) & B[0]
+
+	x = (x | (x >> S[1])) & B[1]
+	y = (y | (y >> S[1])) & B[1]
+
+	x = (x | (x >> S[2])) & B[2]
+	y = (y | (y >> S[2])) & B[2]
+
+	x = (x | (x >> S[3])) & B[3]
+	y = (y | (y >> S[3])) & B[3]
+
+	x = (x | (x >> S[4])) & B[4]
+	y = (y | (y >> S[4])) & B[4]
+
+	x = (x | (x >> S[5])) & B[5]
+	y = (y | (y >> S[5])) & B[5]
+
+	return x | (y << 32)
+}
+
 func geohashAlign52Bits(hash GeoHashBits) uint64 {
 	bits := hash.bits
 	bits <<= (52 - hash.step*2)
 	return bits
+}
+
+func decodeGeohash(bits float64, xy [2]float64) bool {
+	hash := GeoHashBits{bits: uint64(bits), step: GEO_STEP_MAX}
+	return geohashDecodeToLongLatWGS84(hash, xy)
+}
+func geohashDecodeToLongLatWGS84(hash GeoHashBits, xy [2]float64) bool {
+	return geohashDecodeToLongLatType(hash, xy)
+}
+
+func geohashDecodeToLongLatType(hash GeoHashBits, xy [2]float64) bool {
+	area := new(GeoHashArea)
+	if xy == [2]float64{0, 0} || !geohashDecodeType(hash, area) {
+		return false
+	}
+	return geohashDecodeAreaToLongLat(area, xy)
+}
+
+func geohashDecodeType(hash GeoHashBits, area *GeoHashArea) bool {
+	r := [2]GeoHashRange{}
+	geohashGetCoordRange(&r[0], &r[1])
+	return geohashDecode(r[0], r[1], hash, area)
+}
+
+func geohashDecodeWGS84(hash GeoHashBits, area *GeoHashArea) bool {
+	return geohashDecodeType(hash, area)
+}
+
+func geohashDecodeAreaToLongLat(area *GeoHashArea, xy [2]float64) bool {
+	if xy == [2]float64{0, 0} {
+		return false
+	}
+	xy[0] = (area.longitude.min + area.longitude.max) / 2
+	xy[1] = (area.latitude.min + area.latitude.max) / 2
+	return true
+
+}
+
+func hashIsZero(hash GeoHashBits) bool {
+	return hash.bits == 0 && hash.step == 0
+}
+
+func rangeIsZero(r GeoHashRange) bool {
+	return r.max == 0 && r.min == 0
+}
+
+func geohashDecode(long_range GeoHashRange, lat_range GeoHashRange, hash GeoHashBits, area *GeoHashArea) bool {
+	if hashIsZero(hash) || area == nil || rangeIsZero(lat_range) || rangeIsZero(long_range) {
+		return false
+	}
+
+	area.hash = hash
+	step := hash.step
+	hash_sep := deinterleave64(hash.bits)
+
+	lat_scale := lat_range.max - lat_range.min
+	long_scale := long_range.max - long_range.min
+
+	ilato := float64(hash_sep)
+	ilono := float64(hash_sep >> 32)
+
+	area.latitude.min = lat_range.min + (ilato*1.0/float64(uint64(1)<<step))*lat_scale
+	area.latitude.max = lat_range.min + ((ilato+1)*1.0/float64(uint64(1)<<step))*lat_scale
+	area.longitude.min = long_range.min + (ilono*1.0/float64(uint64(1)<<step))*long_scale
+	area.longitude.max = long_range.min + ((ilono+1)*1.0/float64(uint64(1)<<step))*long_scale
+
+	return true
 }

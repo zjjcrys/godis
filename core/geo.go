@@ -1,8 +1,8 @@
 package core
 
 import (
-		"strconv"
 	"os"
+	"strconv"
 )
 
 // geoaddCommand 命令实现
@@ -27,10 +27,10 @@ func GeoAddCommand(c *Client, s *Server) {
 		if lngObj, ok1 := c.Argv[i*3+2].Ptr.(string); ok1 {
 			if latObj, ok2 := c.Argv[i*3+3].Ptr.(string); ok2 {
 				var ok error
-				xy[0],ok = strconv.ParseFloat(lngObj, 64)
-				xy[1],ok = strconv.ParseFloat(latObj, 64)
-				if ok!=nil {
-					addReplyError(c,"lng lat type error")
+				xy[0], ok = strconv.ParseFloat(lngObj, 64)
+				xy[1], ok = strconv.ParseFloat(latObj, 64)
+				if ok != nil {
+					addReplyError(c, "lng lat type error")
 					os.Exit(0)
 				}
 			}
@@ -52,9 +52,39 @@ func GeoAddCommand(c *Client, s *Server) {
 
 //获取特定位置的hash值
 func GeoHashCommand(c *Client, s *Server) {
-	//geoalphabet :="0123456789bcdefghjkmnpqrstuvwxyz"
-	//robj:=lookupKey(c.Db,c.Argv[1])
+	geoAlphabet := "0123456789bcdefghjkmnpqrstuvwxyz"
+	zobj := lookupKey(c.Db, c.Argv[1])
+	if zobj != nil && zobj.ObjectType != OBJ_ZSET {
+		return
+	}
 
+	for j := 2; j < c.Argc; j++ {
+		var score float64
+		if zobj == nil || zsetScore(zobj, c.Argv[j].Ptr.(string), &score) == C_ERR {
+			addReplyError(c, "score get error ")
+			return
+		}
+		var xy [2]float64
+		if !decodeGeohash(score, xy) {
+			addReplyError(c, "hash get error")
+			continue
+		}
+		r := [2]GeoHashRange{}
+		var hash GeoHashBits
+		r[0].min = -180
+		r[0].max = 180
+		r[1].min = -90
+		r[1].max = 90
+		geohashEncode(&r[0], &r[1], xy[0], xy[1], 26, &hash)
+
+		buf := ""
+		for i := 0; i < 11; i++ {
+			count := 52 - (i+1)*5
+			idx := (hash.bits >> (uint(count))) & 0x1f
+			buf += string(geoAlphabet[idx])
+		}
+		addReplyStatus(c, buf)
+	}
 }
 
 //获取经纬度

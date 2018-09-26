@@ -372,3 +372,23 @@ func zslDeleteNode(zsl *zSkipList, x *zSkipListNode, update []*zSkipListNode) {
 	}
 	zsl.length--
 }
+
+func zsetScore(zobj *GodisObject, member string, score *float64) int {
+	if zobj == nil || member == "" {
+		return C_ERR
+	}
+	// only search skiplist
+	if zobj.ObjectType == OBJ_ZSET {
+		zs := zobj.Ptr.(*zSet)
+		dict := zs.dict
+		de := dictFind(dict, member)
+		if de == nil {
+			return C_ERR
+		}
+		value := de.Ptr.(float64)
+		*score = value
+	} else {
+		panic("Unknown sorted set encoding")
+	}
+	return C_OK
+}
