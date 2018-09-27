@@ -2,8 +2,7 @@ package core
 
 import (
 	"math/rand"
-	"strconv"
-)
+	)
 
 /* Input flags. */
 const ZADD_NONE = 0
@@ -148,12 +147,10 @@ func zSetAdd(zObj *GodisObject, score float64, ele string, flags *int, newScore 
 
 			}
 			//获取存储的score
-			if scoreTemp, ok := de.Ptr.(string); !ok {
-				var ok1 error
-				curscore, ok1 = strconv.ParseFloat(scoreTemp, 64)
-				if ok1 != nil {
-					//exit
-				}
+			if coreTemp, ok := de.Ptr.(float64); ok {
+				curscore = coreTemp
+			} else {
+				//exit
 			}
 
 			//remove and in-insert when score changes
@@ -382,6 +379,7 @@ func zsetScore(zobj *GodisObject, member string, score *float64) int {
 		zs := zobj.Ptr.(*zSet)
 		dict := zs.dict
 		de := dictFind(dict, member)
+
 		if de == nil {
 			return C_ERR
 		}

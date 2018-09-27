@@ -145,7 +145,7 @@ func geohashDecodeToLongLatWGS84(hash GeoHashBits, xy [2]float64) bool {
 
 func geohashDecodeToLongLatType(hash GeoHashBits, xy [2]float64) bool {
 	area := new(GeoHashArea)
-	if xy == [2]float64{0, 0} || !geohashDecodeType(hash, area) {
+	if !geohashDecodeType(hash, area) {
 		return false
 	}
 	return geohashDecodeAreaToLongLat(area, xy)
