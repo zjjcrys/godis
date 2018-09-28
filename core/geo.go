@@ -1,9 +1,9 @@
 package core
 
 import (
+	"fmt"
 	"os"
 	"strconv"
-		"fmt"
 )
 
 // geoaddCommand 命令实现
@@ -78,14 +78,14 @@ func GeoHashCommand(c *Client, s *Server) {
 		r[1].max = 90
 		geohashEncode(&r[0], &r[1], xy[0], xy[1], 26, &hash)
 
-		temp:=""
+		temp := ""
 		for i := 0; i < 11; i++ {
 			count := 52 - (i+1)*5
 			idx := (hash.bits >> (uint(count))) & 0x1f
 			temp += string(geoAlphabet[idx])
 		}
-		buf+=temp
-		buf+=";"
+		buf += temp
+		buf += ";"
 	}
 	addReplyStatus(c, buf)
 }
@@ -96,7 +96,7 @@ func GeoPosCommand(c *Client, s *Server) {
 	if zobj != nil && zobj.ObjectType != OBJ_ZSET {
 		return
 	}
-	buf :="lng:"
+	buf := "lng:"
 
 	for j := 2; j < c.Argc; j++ {
 		var score float64
@@ -110,17 +110,17 @@ func GeoPosCommand(c *Client, s *Server) {
 			continue
 		}
 
-		buf+=fmt.Sprint(xy[0])
-		buf+=",lat:"
-		buf+=fmt.Sprint(xy[1])
-		buf+=";"
+		buf += fmt.Sprint(xy[0])
+		buf += ",lat:"
+		buf += fmt.Sprint(xy[1])
+		buf += ";"
 	}
 	addReplyStatus(c, buf)
 }
 
 //获取两个位置的距离
 func GeoDistCommand(c *Client, s *Server) {
-	if c.Argc>=5 {
+	if c.Argc >= 5 {
 		addReplyError(c, "params error")
 		return
 	}
@@ -129,20 +129,19 @@ func GeoDistCommand(c *Client, s *Server) {
 		return
 	}
 
-	var score1,score2 float64
-	var xyxy1,xyxy2 [2]float64
-	if zsetScore(zobj,c.Argv[2].Ptr.(string), &score1)==C_ERR ||
-		zsetScore(zobj, c.Argv[3].Ptr.(string), &score2)==C_ERR {
+	var score1, score2 float64
+	var xyxy1, xyxy2 [2]float64
+	if zsetScore(zobj, c.Argv[2].Ptr.(string), &score1) == C_ERR ||
+		zsetScore(zobj, c.Argv[3].Ptr.(string), &score2) == C_ERR {
 		addReplyError(c, "score get error ")
 		return
 	}
 
-	if !decodeGeohash(score1,&xyxy1) || !decodeGeohash(score2, &xyxy2) {
+	if !decodeGeohash(score1, &xyxy1) || !decodeGeohash(score2, &xyxy2) {
 		addReplyError(c, "hash get error")
 		return
 	}
 
-	buf:=geohashGetDistance(xyxy1[0],xyxy1[1],xyxy2[0],xyxy2[1])
+	buf := geohashGetDistance(xyxy1[0], xyxy1[1], xyxy2[0], xyxy2[1])
 	addReplyStatus(c, fmt.Sprint(buf))
 }
-

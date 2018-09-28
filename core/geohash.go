@@ -9,10 +9,10 @@ const GEO_LAT_MIN = -85.05112878
 const GEO_LAT_MAX = 85.05112878
 const GEO_LONG_MIN = -180
 const GEO_LONG_MAX = 180
-const D_R = (math.Pi/180.0)
+const D_R = (math.Pi / 180.0)
 
 /// @brief Earth's quatratic mean radius for WGS-84
-const EARTH_RADIUS_IN_METERS=6372797.560856
+const EARTH_RADIUS_IN_METERS = 6372797.560856
 
 type GeoHashBits struct {
 	bits uint64
@@ -30,11 +30,11 @@ type GeoHashArea struct {
 	latitude  GeoHashRange
 }
 
-func deg_rad(ang float64) float64{
-	return ang *D_R
+func deg_rad(ang float64) float64 {
+	return ang * D_R
 }
 func rad_deg(ang float64) float64 {
-	return ang/D_R
+	return ang / D_R
 }
 
 func geohashEncodeWGS84(longitude float64, latitude float64, step uint8, hash *GeoHashBits) int {
@@ -158,7 +158,7 @@ func geohashDecodeToLongLatWGS84(hash GeoHashBits, xy *[2]float64) bool {
 
 func geohashDecodeToLongLatType(hash GeoHashBits, xy *[2]float64) bool {
 	area := new(GeoHashArea)
-	if xy==nil || !geohashDecodeType(hash, area) {
+	if xy == nil || !geohashDecodeType(hash, area) {
 		return false
 	}
 	return geohashDecodeAreaToLongLat(area, xy)
@@ -215,15 +215,14 @@ func geohashDecode(long_range GeoHashRange, lat_range GeoHashRange, hash GeoHash
 	return true
 }
 
-func geohashGetDistance(lon1d float64,lat1d float64,lon2d float64,lat2d float64) float64{
-	var lat1r,lon1r,lat2r,lon2r,u,v float64
-	lat1r = deg_rad(lat1d);
-	lon1r = deg_rad(lon1d);
-	lat2r = deg_rad(lat2d);
-	lon2r = deg_rad(lon2d);
-	u = math.Sin((lat2r - lat1r) / 2);
-	v = math.Sin((lon2r - lon1r) / 2);
+func geohashGetDistance(lon1d float64, lat1d float64, lon2d float64, lat2d float64) float64 {
+	var lat1r, lon1r, lat2r, lon2r, u, v float64
+	lat1r = deg_rad(lat1d)
+	lon1r = deg_rad(lon1d)
+	lat2r = deg_rad(lat2d)
+	lon2r = deg_rad(lon2d)
+	u = math.Sin((lat2r - lat1r) / 2)
+	v = math.Sin((lon2r - lon1r) / 2)
 	return 2.0 * EARTH_RADIUS_IN_METERS *
-		math.Asin(math.Sqrt(u * u + math.Cos(lat1r) * math.Cos(lat2r) * v * v));
+		math.Asin(math.Sqrt(u*u+math.Cos(lat1r)*math.Cos(lat2r)*v*v))
 }
-
