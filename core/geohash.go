@@ -53,7 +53,7 @@ type GeoHashNeighbors struct {
 }
 
 type geoArray struct {
-	array   *geoPoint
+	array   []*geoPoint
 	buckets uint
 	used    uint
 }

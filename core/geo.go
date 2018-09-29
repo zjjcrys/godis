@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 )
 
 const RADIUS_COORDS = (1 << 0) /* Search around coordinates. */
@@ -162,35 +163,222 @@ func GeoRadiusByMemberCommand(c *Client, s *Server) {
 	georadiusGeneric(c, RADIUS_MEMBER)
 }
 
-func georadiusGeneric(c *Client, flags int) {
-	storedist := 0
+//georadius Sicily 15 37 100 km
+func georadiusGeneric(c *Client, flags uint) {
+	var storekey *GodisObject
+	storedist := 0 /* 0 for STORE, 1 for STOREDIST. */
+
+	//获取有序集合
 	zobj := lookupKey(c.Db, c.Argv[1])
 	if zobj != nil && zobj.ObjectType != OBJ_ZSET {
 		return
 	}
 
 	var xy [2]float64
-	if !decodeGeohash(score, &xy) {
-		addReplyError(c, "hash get error")
-		continue
+	var base_args int
+	if flags&RADIUS_COORDS > 0 {
+		base_args = 6
+
+		var ok1, ok2 bool
+		xy[0], ok1 = c.Argv[2].Ptr.(float64)
+		xy[1], ok2 = c.Argv[3].Ptr.(float64)
+		if !ok1 || !ok2 {
+			addReplyError(c, "get lng lat error")
+			return
+		}
+	} else if flags&RADIUS_MEMBER > 0 {
+		//member command
+		base_args = 7
+	} else {
+		addReplyError(c, "Unknown georadius search type")
+		return
 	}
 
-	//从参数中获取半径和单位
-	var radius_meters, conversion float64
-	radius_meters = c.Argv
+	//获取参数单位
+	conversion := extractUnitOrReply(c, *c.Argv[base_args-1])
+	radius_meters := c.Argv[base_args-2].Ptr.(float64) * conversion
 
-	//提取所有可选参数
+	// 提取所有可选参数
 	withdist := 0
 	withhash := 0
 	withcoords := 0
 	sort := SORT_NONE
-	var count int64
-	count = 0
+	var count int64 = 0
+	if c.Argc > base_args {
+		remaining := c.Argc - base_args
+		for i := 0; i < remaining; i++ {
+			arg := c.Argv[base_args+i].Ptr.(string)
+			if strings.EqualFold(arg, "withdist") {
+				withdist = 1
+			} else if strings.EqualFold(arg, "withhash") {
+				withhash = 1
+			} else if strings.EqualFold(arg, "withcoord") {
+				withcoords = 1
+			} else if strings.EqualFold(arg, "asc") {
+				sort = SORT_ASC
+			} else if strings.EqualFold(arg, "desc") {
+				sort = SORT_DESC
+			} else if strings.EqualFold(arg, "count") && (i+1) < remaining {
+
+				if count < 0 {
+					addReplyError(c, "COUNT must be > 0")
+					return
+				}
+				i++
+			} else if strings.EqualFold(arg, "store") && (i+1) < remaining && (flags&RADIUS_NOSTORE == 0) {
+				storekey = c.Argv[base_args+i+1]
+				storedist = 0
+				i++
+			} else if strings.EqualFold(arg, "storedist") && (i+1) < remaining && (flags&RADIUS_NOSTORE == 0) {
+				storekey = c.Argv[base_args+i+1]
+				storedist = 1
+				i++
+			} else {
+				addReplyError(c, "params error")
+				return
+			}
+		}
+	}
+
+	if storekey != nil && (withdist > 0 || withhash > 0 || withcoords > 0) {
+		addReplyError(c,
+			"STORE option in GEORADIUS is not compatible with "+
+				"WITHDIST, WITHHASH and WITHCOORDS options")
+		return
+	}
+
+	// 指定排序方式
+	if count != 0 && sort == SORT_NONE {
+		sort = SORT_ASC
+	}
+
+	// 定位中心点所处的范围
+	georadius := geohashGetAreasByRadiusWGS84(xy[0], xy[1], radius_meters)
+
+	/* Search the zset for all matching points */
+	ga := geoArrayCreate() // 对中心点以及它的八个方向进行查找，找出所有范围内的元素
+	membersOfAllNeighbors(zobj, georadius, xy[0], xy[1], radius_meters, ga)
+
+	if ga.used == 0 && storekey == nil {
+		addReplyError(c, "emptymultibulk")
+		return
+	}
+
+	result_length := ga.used
+	var returned_items int
+	if count == 0 || int64(result_length) < count {
+		returned_items = int(result_length)
+	} else {
+		returned_items = int(count)
+	}
+	option_length := 0
+
+	if sort == SORT_ASC {
+
+	} else if sort == SORT_DESC {
+
+	}
+
+	if storekey == nil {
+		if withdist > 0 {
+			option_length++
+		}
+		if withcoords > 0 {
+			option_length++
+		}
+		if withhash > 0 {
+			option_length++
+		}
+
+		/* Finally send results back to the caller */
+		for i := 0; i < returned_items; i++ {
+			gp := ga.array[i]
+			gp.dist /= conversion
+
+		}
+	} else {
+		fmt.Println(storedist)
+	}
 
 }
 
-func membersOfAllNeighbors() {
+func geoArrayCreate() *geoArray {
+	ga := new(geoArray)
+	ga.array = nil
+	ga.buckets = 0
+	ga.used = 0
+	return ga
+}
 
+//单位
+func extractUnitOrReply(c *Client, uint GodisObject) float64 {
+	u := uint.Ptr.(string)
+
+	if strings.Compare(u, "m") == 0 {
+		return 1
+	} else if strings.Compare(u, "km") == 0 {
+		return 1000
+	} else if strings.Compare(u, "ft") == 0 {
+		return 0.3048
+	} else if strings.Compare(u, "mi") == 0 {
+		return 1609.34
+	} else {
+		addReplyError(c, "unsupported unit provided. please use m, km, ft, mi")
+		return -1
+	}
+}
+
+func membersOfAllNeighbors(zobj *GodisObject, n GeoHashRadius, lon float64, lat float64, radius float64, ga *geoArray) int {
+	neighbors := [9]GeoHashBits{}
+	var count, last_processed int
+	debugmsg := 0
+
+	neighbors[0] = n.hash
+	neighbors[1] = n.neighbors.north
+	neighbors[2] = n.neighbors.south
+	neighbors[3] = n.neighbors.east
+	neighbors[4] = n.neighbors.west
+	neighbors[5] = n.neighbors.north_east
+	neighbors[6] = n.neighbors.north_west
+	neighbors[7] = n.neighbors.south_east
+	neighbors[8] = n.neighbors.south_west
+
+	for i := 0; i < len(neighbors); i++ {
+		if hashIsZero(neighbors[i]) {
+			continue
+		}
+
+		/* Debugging info. */
+		if debugmsg > 0 {
+			var long_range, lat_range GeoHashRange
+			geohashGetCoordRange(&long_range, &lat_range)
+			myarea := new(GeoHashArea)
+			geohashDecode(long_range, lat_range, neighbors[i], myarea)
+
+			/* Dump center square. */
+			fmt.Println("neighbors[%d]:\n", i)
+			fmt.Println("area.longitude.min: %f\n", myarea.longitude.min)
+			fmt.Println("area.longitude.max: %f\n", myarea.longitude.max)
+			fmt.Println("area.latitude.min: %f\n", myarea.latitude.min)
+			fmt.Println("area.latitude.max: %f\n", myarea.latitude.max)
+		}
+
+		/* When a huge Radius (in the 5000 km range or more) is used,
+		 * adjacent neighbors can be the same, leading to duplicated
+		 * elements. Skip every range which is the same as the one
+		 * processed previously. */
+		if last_processed > 0 &&
+			neighbors[i].bits == neighbors[last_processed].bits &&
+			neighbors[i].step == neighbors[last_processed].step {
+			if debugmsg > 0 {
+				fmt.Println("Skipping processing of %d, same as previous\n", i)
+			}
+			continue
+		}
+		count += membersOfGeoHashBox(zobj, neighbors[i], ga, lon, lat, radius)
+		last_processed = i
+	}
+	return count
 }
 
 func membersOfGeoHashBox(zobj *GodisObject, hash GeoHashBits, ga *geoArray, lon float64, lat float64, radius float64) int {
@@ -207,13 +395,14 @@ func scoresOfGeoHashBox(hash GeoHashBits, min *GeoHashFix52Bits, max *GeoHashFix
 }
 
 func geoGetPointsInRange(zobj *GodisObject, min float64, max float64, lon float64, lat float64, radius float64, ga *geoArray) int {
-	range :=zRangeSpec{min:min,max:max,minEx:0,maxEx:1}
+	/*range :=zRangeSpec{min:min,max:max,minEx:0,maxEx:1}
 	var origincount uint = ga.used
 	var member string
 	if zobj.ObjectType==OBJ_ZSET {
-	
+
 	} else {
 		//ziplist
 	}
-	return ga.used - origincount;
+	return ga.used - origincount;*/
+	return 1
 }
