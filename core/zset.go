@@ -2,7 +2,7 @@ package core
 
 import (
 	"math/rand"
-	)
+)
 
 /* Input flags. */
 const ZADD_NONE = 0

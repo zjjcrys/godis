@@ -99,14 +99,18 @@ func initServer() {
 	geohashCommand := &core.GodisCommand{Name: "geohash", Proc: core.GeoHashCommand}
 	geoposCommand := &core.GodisCommand{Name: "geopos", Proc: core.GeoPosCommand}
 	geodistCommand := &core.GodisCommand{Name: "geodist", Proc: core.GeoDistCommand}
+	georadiusCommand := &core.GodisCommand{Name: "georadius", Proc: core.GeoRadiusCommand}
+	georadiusbymemberCommand := &core.GodisCommand{Name: "georadiusbymember", Proc: core.GeoRadiusByMemberCommand}
 
 	godis.Commands = map[string]*core.GodisCommand{
-		"get":     getCommand,
-		"set":     setCommand,
-		"geoadd":  geoaddCommand,
-		"geohash": geohashCommand,
-		"geopos":  geoposCommand,
-		"geodist": geodistCommand,
+		"get":               getCommand,
+		"set":               setCommand,
+		"geoadd":            geoaddCommand,
+		"geohash":           geohashCommand,
+		"geopos":            geoposCommand,
+		"geodist":           geodistCommand,
+		"georadius":         georadiusCommand,
+		"georadiusbymember": georadiusbymemberCommand,
 	}
 	LoadData()
 }

@@ -6,6 +6,14 @@ import (
 	"strconv"
 )
 
+const RADIUS_COORDS = (1 << 0) /* Search around coordinates. */
+const RADIUS_MEMBER = (1 << 1) /* Search around member. */
+const RADIUS_NOSTORE = (1 << 2)
+
+const SORT_NONE = 0
+const SORT_ASC = 1
+const SORT_DESC = 2
+
 // geoaddCommand 命令实现
 func GeoAddCommand(c *Client, s *Server) {
 	// check params numbers
@@ -144,4 +152,68 @@ func GeoDistCommand(c *Client, s *Server) {
 
 	buf := geohashGetDistance(xyxy1[0], xyxy1[1], xyxy2[0], xyxy2[1])
 	addReplyStatus(c, fmt.Sprint(buf))
+}
+
+func GeoRadiusCommand(c *Client, s *Server) {
+	georadiusGeneric(c, RADIUS_COORDS)
+}
+
+func GeoRadiusByMemberCommand(c *Client, s *Server) {
+	georadiusGeneric(c, RADIUS_MEMBER)
+}
+
+func georadiusGeneric(c *Client, flags int) {
+	storedist := 0
+	zobj := lookupKey(c.Db, c.Argv[1])
+	if zobj != nil && zobj.ObjectType != OBJ_ZSET {
+		return
+	}
+
+	var xy [2]float64
+	if !decodeGeohash(score, &xy) {
+		addReplyError(c, "hash get error")
+		continue
+	}
+
+	//从参数中获取半径和单位
+	var radius_meters, conversion float64
+	radius_meters = c.Argv
+
+	//提取所有可选参数
+	withdist := 0
+	withhash := 0
+	withcoords := 0
+	sort := SORT_NONE
+	var count int64
+	count = 0
+
+}
+
+func membersOfAllNeighbors() {
+
+}
+
+func membersOfGeoHashBox(zobj *GodisObject, hash GeoHashBits, ga *geoArray, lon float64, lat float64, radius float64) int {
+	var min, max GeoHashFix52Bits
+
+	scoresOfGeoHashBox(hash, &min, &max)
+	return geoGetPointsInRange(zobj, float64(min), float64(max), lon, lat, radius, ga)
+}
+
+func scoresOfGeoHashBox(hash GeoHashBits, min *GeoHashFix52Bits, max *GeoHashFix52Bits) {
+	*min = geohashAlign52Bits(hash)
+	hash.bits++
+	*max = geohashAlign52Bits(hash)
+}
+
+func geoGetPointsInRange(zobj *GodisObject, min float64, max float64, lon float64, lat float64, radius float64, ga *geoArray) int {
+	range :=zRangeSpec{min:min,max:max,minEx:0,maxEx:1}
+	var origincount uint = ga.used
+	var member string
+	if zobj.ObjectType==OBJ_ZSET {
+	
+	} else {
+		//ziplist
+	}
+	return ga.used - origincount;
 }
