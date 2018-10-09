@@ -63,7 +63,7 @@ type geoPoint struct {
 	latitude  float64
 	dist      float64
 	score     float64
-	member    *rune
+	member    string
 }
 
 func deg_rad(ang float64) float64 {
@@ -436,14 +436,14 @@ func Geohash_move_x(hash *GeoHashBits, d int8) {
 	x := hash.bits & 0xaaaaaaaaaaaaaaaa
 	y := hash.bits & 0x5555555555555555
 
-	zz := uint64(0xaaaaaaaaaaaaaaaa >> (64 - hash.step*2))
+	zz := uint64(0x5555555555555555 >> (64 - hash.step*2))
 	if d > 0 {
-		y = y + (zz + 1)
+		x = x + (zz + 1)
 	} else {
-		y = y | zz
-		y = y - (zz + 1)
+		x = x | zz
+		x = x - (zz + 1)
 	}
-	y &= (0x5555555555555555 >> (64 - hash.step*2))
+	x &= (0xaaaaaaaaaaaaaaaa >> (64 - hash.step*2))
 	hash.bits = (x | y)
 }
 

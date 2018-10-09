@@ -95,6 +95,8 @@ func initServer() {
 
 	getCommand := &core.GodisCommand{Name: "get", Proc: core.GetCommand}
 	setCommand := &core.GodisCommand{Name: "set", Proc: core.SetCommand}
+	subscribeCommand := &core.GodisCommand{Name: "subscribe", Proc: core.SubscribeCommand}
+	publishCommand := &core.GodisCommand{Name: "publish", Proc: core.PublishCommand}
 	geoaddCommand := &core.GodisCommand{Name: "geoadd", Proc: core.GeoAddCommand}
 	geohashCommand := &core.GodisCommand{Name: "geohash", Proc: core.GeoHashCommand}
 	geoposCommand := &core.GodisCommand{Name: "geopos", Proc: core.GeoPosCommand}
@@ -111,7 +113,10 @@ func initServer() {
 		"geodist":           geodistCommand,
 		"georadius":         georadiusCommand,
 		"georadiusbymember": georadiusbymemberCommand,
+		"subscribe":         subscribeCommand,
+		"publish":           publishCommand,
 	}
+	godis.PubSubChannels = new(map[string]*core.List)
 	LoadData()
 }
 

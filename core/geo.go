@@ -178,12 +178,18 @@ func georadiusGeneric(c *Client, flags uint) {
 	var base_args int
 	if flags&RADIUS_COORDS > 0 {
 		base_args = 6
-
-		var ok1, ok2 bool
-		xy[0], ok1 = c.Argv[2].Ptr.(float64)
-		xy[1], ok2 = c.Argv[3].Ptr.(float64)
+		arg2, ok1 := c.Argv[2].Ptr.(string)
+		arg3, ok2 := c.Argv[3].Ptr.(string)
 		if !ok1 || !ok2 {
 			addReplyError(c, "get lng lat error")
+			return
+		}
+
+		var err error
+		xy[0], err = strconv.ParseFloat(arg2, 64)
+		xy[1], err = strconv.ParseFloat(arg3, 64)
+		if err != nil {
+			addReplyError(c, "get lng lat float error")
 			return
 		}
 	} else if flags&RADIUS_MEMBER > 0 {
@@ -196,7 +202,12 @@ func georadiusGeneric(c *Client, flags uint) {
 
 	//获取参数单位
 	conversion := extractUnitOrReply(c, *c.Argv[base_args-1])
-	radius_meters := c.Argv[base_args-2].Ptr.(float64) * conversion
+	radius_meters, err := strconv.ParseFloat(c.Argv[base_args-2].Ptr.(string), 64)
+	if err != nil {
+		addReplyError(c, "radius_meters error")
+		return
+	}
+	radius_meters = radius_meters * conversion
 
 	// 提取所有可选参数
 	withdist := 0
@@ -294,8 +305,10 @@ func georadiusGeneric(c *Client, flags uint) {
 		for i := 0; i < returned_items; i++ {
 			gp := ga.array[i]
 			gp.dist /= conversion
-
+			fmt.Println(gp)
+			addReplyStatus(c, gp.member)
 		}
+
 	} else {
 		fmt.Println(storedist)
 	}
@@ -304,7 +317,7 @@ func georadiusGeneric(c *Client, flags uint) {
 
 func geoArrayCreate() *geoArray {
 	ga := new(geoArray)
-	ga.array = nil
+	ga.array = make([]*geoPoint, 0)
 	ga.buckets = 0
 	ga.used = 0
 	return ga
@@ -395,14 +408,63 @@ func scoresOfGeoHashBox(hash GeoHashBits, min *GeoHashFix52Bits, max *GeoHashFix
 }
 
 func geoGetPointsInRange(zobj *GodisObject, min float64, max float64, lon float64, lat float64, radius float64, ga *geoArray) int {
-	/*range :=zRangeSpec{min:min,max:max,minEx:0,maxEx:1}
+	zrange := zRangeSpec{min: min, max: max, minEx: 0, maxEx: 1}
 	var origincount uint = ga.used
-	var member string
-	if zobj.ObjectType==OBJ_ZSET {
+	//var member string
+	if zobj.ObjectType == OBJ_ZSET {
+		zs := zobj.Ptr.(*zSet) //使用*zSet好，还是zSet
+		zsl := zs.zsl
+		var ln *zSkipListNode
 
+		ln = zslFirstInRange(zsl, &zrange)
+		if ln == nil {
+			return 0
+		}
+
+		for ln != nil {
+			ele := ln.ele
+			if !zslValueLteMax(ln.score, &zrange) {
+				break
+			}
+			geoAppendIfWithinRadius(ga, lon, lat, radius, ln.score, ele)
+			ln = ln.level[0].forward
+		}
 	} else {
 		//ziplist
 	}
-	return ga.used - origincount;*/
-	return 1
+	return int(ga.used - origincount)
+}
+
+func geoAppendIfWithinRadius(ga *geoArray, lon float64, lat float64, radius float64, score float64, member string) int {
+	var distance float64
+	xy := [2]float64{}
+
+	if !decodeGeohash(score, &xy) {
+		return C_ERR
+	}
+	if !geohashGetDistanceIfInRadiusWGS84(lon, lat, xy[0], xy[1], radius, &distance) {
+		return C_ERR
+	}
+
+	gp := geoArrayAppend(ga)
+	gp.longitude = xy[0]
+	gp.latitude = xy[1]
+	gp.dist = distance
+	gp.member = member
+	gp.score = score
+	return C_OK
+}
+
+func geoArrayAppend(ga *geoArray) *geoPoint {
+	if ga.used == ga.buckets {
+		if ga.buckets == 0 {
+			ga.buckets = 8
+		} else {
+			ga.buckets = ga.buckets * 2
+		}
+	}
+	gp := new(geoPoint)
+	ga.array = append(ga.array, gp)
+	ga.used++
+	return gp
 }
