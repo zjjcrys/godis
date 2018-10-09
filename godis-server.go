@@ -116,7 +116,8 @@ func initServer() {
 		"subscribe":         subscribeCommand,
 		"publish":           publishCommand,
 	}
-	godis.PubSubChannels = new(map[string]*core.List)
+	tmp := make(map[string]*core.List)
+	godis.PubSubChannels = &tmp
 	LoadData()
 }
 
