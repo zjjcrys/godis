@@ -63,19 +63,28 @@ func main() {
 func handle(conn net.Conn) {
 	c := godis.CreateClient()
 	for {
-		err := c.ReadQueryFromClient(conn)
+		if c.Flags&core.CLIENT_PUBSUB > 0 {
+			if c.Buf != "" {
+				responseConn(conn, c)
+				c.Buf = ""
+			}
+			time.Sleep(1)
 
-		if err != nil {
-			log.Println("readQueryFromClient err", err)
-			return
+		} else {
+			err := c.ReadQueryFromClient(conn)
+
+			if err != nil {
+				log.Println("readQueryFromClient err", err)
+				return
+			}
+			err = c.ProcessInputBuffer()
+			if err != nil {
+				log.Println("ProcessInputBuffer err", err)
+				return
+			}
+			godis.ProcessCommand(c)
+			responseConn(conn, c)
 		}
-		err = c.ProcessInputBuffer()
-		if err != nil {
-			log.Println("ProcessInputBuffer err", err)
-			return
-		}
-		godis.ProcessCommand(c)
-		responseConn(conn, c)
 	}
 }
 

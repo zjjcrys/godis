@@ -21,7 +21,11 @@ type Client struct {
 	FakeFlag       bool
 	PubSubChannels *map[string]*List
 	PubSubPatterns *List
+	Flags          int //client flags
 }
+
+//flags 模式
+const CLIENT_PUBSUB = (1 << 18)
 
 //GodisCommand redis命令结构
 type GodisCommand struct {
@@ -157,6 +161,7 @@ func (s *Server) CreateClient() (c *Client) {
 	c.QueryBuf = ""
 	tmp := make(map[string]*List, 0)
 	c.PubSubChannels = &tmp
+	c.Flags = 0
 	return c
 }
 

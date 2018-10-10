@@ -6,6 +6,7 @@ func SubscribeCommand(c *Client, s *Server) {
 	for j := 1; j < c.Argc; j++ {
 		pubsubSubscribeChannel(c, c.Argv[j], s)
 	}
+	c.Flags |= CLIENT_PUBSUB
 
 }
 
@@ -35,7 +36,7 @@ func pubsubPublishMessage(channel *GodisObject, message *GodisObject, s *Server)
 	if de != nil {
 		for list := de.head; list != nil; list = list.next {
 			c := list.value.(*Client)
-			addReplyError(c, message.Ptr.(string))
+			addReplyStatus(c, message.Ptr.(string))
 			receivers++
 		}
 	}
